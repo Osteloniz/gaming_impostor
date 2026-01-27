@@ -53,6 +53,14 @@ type PlayerRow = {
 
 let roomChannel: ReturnType<typeof supabase.channel> | null = null
 let playersChannel: ReturnType<typeof supabase.channel> | null = null
+let pollingTimer: ReturnType<typeof setInterval> | null = null
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
 
 const fetchJson = async <T,>(url: string, body: Record<string, unknown>): Promise<T> => {
   const res = await fetch(url, {
@@ -122,6 +130,11 @@ const hydrateRoom = async (
       "postgres_changes",
       { event: "*", schema: "public", table: "rooms", filter: `id=eq.${roomId}` },
       (payload) => {
+        if (payload.eventType === "DELETE") {
+          stopPolling()
+          setState(initialState)
+          return
+        }
         const next = payload.new as RoomRow
         setState({
           status: next.status,
@@ -152,6 +165,36 @@ const hydrateRoom = async (
       },
     )
     .subscribe()
+
+  if (!pollingTimer) {
+    pollingTimer = setInterval(async () => {
+      const { data: refreshedRoom } = await supabase
+        .from("rooms")
+        .select("id, code, status, host_player_id, turn_order, current_turn_index, current_revealing_player")
+        .eq("id", roomId)
+        .single()
+
+      const { data: refreshedPlayers } = await supabase
+        .from("players")
+        .select("id, name, is_host, has_seen_card, voted_for")
+        .eq("room_id", roomId)
+        .order("created_at")
+
+      if (refreshedRoom) {
+        setState({
+          status: refreshedRoom.status,
+          turnOrder: refreshedRoom.turn_order || [],
+          currentTurnIndex: refreshedRoom.current_turn_index ?? 0,
+          currentRevealingPlayer: refreshedRoom.current_revealing_player ?? 0,
+          roomCode: refreshedRoom.code,
+        })
+      }
+
+      if (refreshedPlayers) {
+        setState({ players: mapPlayers(refreshedPlayers as PlayerRow[]) })
+      }
+    }, 5000)
+  }
 }
 
 export const useGameStore = create<GameStore>()(
@@ -178,7 +221,11 @@ export const useGameStore = create<GameStore>()(
       resumeSession: async () => {
         const { roomId, roomCode, playerId } = get()
         if (!roomId || !playerId) return
-        await hydrateRoom(roomId, roomCode, playerId, set)
+        try {
+          await hydrateRoom(roomId, roomCode, playerId, set)
+        } catch {
+          set(initialState)
+        }
       },
 
       startGame: async () => {
@@ -236,14 +283,24 @@ export const useGameStore = create<GameStore>()(
         const { roomId } = get()
         if (!roomId) return
         await fetchJson<{ ok: true }>("/api/game/reset", { roomId })
+        stopPolling()
+        roomChannel?.unsubscribe()
+        playersChannel?.unsubscribe()
+        roomChannel = null
+        playersChannel = null
         set(initialState)
       },
 
       resetGame: async () => {
         const { roomId, playerId } = get()
         if (roomId && playerId) {
-          await fetchJson<{ ok: true }>("/api/rooms/leave", { roomId, playerId })
+          try {
+            await fetchJson<{ ok: true }>("/api/rooms/leave", { roomId, playerId })
+          } catch {
+            // Ignore errors if room was already deleted.
+          }
         }
+        stopPolling()
         roomChannel?.unsubscribe()
         playersChannel?.unsubscribe()
         roomChannel = null

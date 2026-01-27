@@ -12,6 +12,7 @@ export default function CardRevealPage() {
   const router = useRouter()
   const {
     roomCode,
+    roomId,
     players,
     status,
     playerId,
@@ -19,16 +20,23 @@ export default function CardRevealPage() {
     cardRole,
     fetchMyCard,
     markCardSeen,
+    resumeSession,
   } = useGameStore()
 
   const currentPlayer = players.find((player) => player.id === playerId)
   const hasSeenCard = currentPlayer?.hasSeenCard
 
   useEffect(() => {
-    if (!roomCode) {
+    if (!roomCode && roomId && playerId && players.length === 0) {
+      resumeSession()
+    }
+  }, [roomCode, roomId, playerId, players.length, resumeSession])
+
+  useEffect(() => {
+    if (!roomCode && !roomId) {
       router.push("/")
     }
-  }, [roomCode, router])
+  }, [roomCode, roomId, router])
 
   useEffect(() => {
     if (status === "playing") {

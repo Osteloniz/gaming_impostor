@@ -1,12 +1,14 @@
-"use client"
+﻿"use client"
 
 import { create } from "zustand"
+import { persist } from "zustand/middleware"
 import type { GameState, Player, GameResults, CardRole } from "./types"
 import { supabase } from "@/lib/supabase/client"
 
 interface GameStore extends GameState {
   createRoom: (hostName: string) => Promise<void>
   joinRoom: (playerName: string, roomCode: string) => Promise<void>
+  resumeSession: () => Promise<void>
   startGame: () => Promise<void>
   markCardSeen: () => Promise<void>
   fetchMyCard: () => Promise<void>
@@ -152,100 +154,110 @@ const hydrateRoom = async (
     .subscribe()
 }
 
-export const useGameStore = create<GameStore>((set, get) => ({
-  ...initialState,
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
 
-  createRoom: async (hostName: string) => {
-    const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
-      "/api/rooms/create",
-      { name: hostName },
-    )
-    await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
-  },
+      createRoom: async (hostName: string) => {
+        const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
+          "/api/rooms/create",
+          { name: hostName },
+        )
+        await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
+      },
 
-  joinRoom: async (playerName: string, roomCode: string) => {
-    const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
-      "/api/rooms/join",
-      { name: playerName, code: roomCode },
-    )
-    await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
-  },
+      joinRoom: async (playerName: string, roomCode: string) => {
+        const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
+          "/api/rooms/join",
+          { name: playerName, code: roomCode },
+        )
+        await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
+      },
 
-  startGame: async () => {
-    const { roomId } = get()
-    if (!roomId) return
-    await fetchJson<{ ok: true }>("/api/game/start", { roomId })
-    set({ theme: null, cardRole: null, results: null })
-  },
+      resumeSession: async () => {
+        const { roomId, roomCode, playerId } = get()
+        if (!roomId || !playerId) return
+        await hydrateRoom(roomId, roomCode, playerId, set)
+      },
 
-  markCardSeen: async () => {
-    const { roomId, playerId } = get()
-    if (!roomId || !playerId) return
-    await fetchJson<{ ok: true }>("/api/game/ready", { roomId, playerId })
-  },
+      startGame: async () => {
+        const { roomId } = get()
+        if (!roomId) return
+        await fetchJson<{ ok: true }>("/api/game/start", { roomId })
+        set({ theme: null, cardRole: null, results: null })
+      },
 
-  fetchMyCard: async () => {
-    const { roomId, playerId } = get()
-    if (!roomId || !playerId) return
-    const data = await fetchJson<{ role: CardRole; theme: string | null }>(
-      "/api/game/my-card",
-      { roomId, playerId },
-    )
-    set({ cardRole: data.role, theme: data.theme })
-  },
+      markCardSeen: async () => {
+        const { roomId, playerId } = get()
+        if (!roomId || !playerId) return
+        await fetchJson<{ ok: true }>("/api/game/ready", { roomId, playerId })
+      },
 
-  nextTurn: async () => {
-    const { roomId, currentTurnIndex, turnOrder } = get()
-    if (!roomId || turnOrder.length === 0) return
-    const isLast = currentTurnIndex >= turnOrder.length - 1
-    const updates = isLast
-      ? { status: "voting", current_turn_index: 0 }
-      : { current_turn_index: currentTurnIndex + 1 }
+      fetchMyCard: async () => {
+        const { roomId, playerId } = get()
+        if (!roomId || !playerId) return
+        const data = await fetchJson<{ role: CardRole; theme: string | null }>(
+          "/api/game/my-card",
+          { roomId, playerId },
+        )
+        set({ cardRole: data.role, theme: data.theme })
+      },
 
-    await supabase.from("rooms").update(updates).eq("id", roomId)
-  },
+      nextTurn: async () => {
+        const { roomId, currentTurnIndex, turnOrder } = get()
+        if (!roomId || turnOrder.length === 0) return
+        const isLast = currentTurnIndex >= turnOrder.length - 1
+        const updates = isLast
+          ? { status: "voting", current_turn_index: 0 }
+          : { current_turn_index: currentTurnIndex + 1 }
 
-  castVote: async (votedForId: string) => {
-    const { roomId, playerId } = get()
-    if (!roomId || !playerId) return
-    await fetchJson<{ ok: true }>("/api/game/vote", {
-      roomId,
-      voterId: playerId,
-      votedForId,
-    })
-  },
+        await supabase.from("rooms").update(updates).eq("id", roomId)
+      },
 
-  fetchResults: async () => {
-    const { roomId } = get()
-    if (!roomId) return
-    const data = await fetchJson<GameResults>("/api/game/results", { roomId })
-    set({ results: data, theme: data.theme })
-  },
+      castVote: async (votedForId: string) => {
+        const { roomId, playerId } = get()
+        if (!roomId || !playerId) return
+        await fetchJson<{ ok: true }>("/api/game/vote", {
+          roomId,
+          voterId: playerId,
+          votedForId,
+        })
+      },
 
-  resetToLobby: async () => {
-    const { roomId } = get()
-    if (!roomId) return
-    await fetchJson<{ ok: true }>("/api/game/reset", { roomId })
-    set({
-      status: "lobby",
-      theme: null,
-      cardRole: null,
-      turnOrder: [],
-      currentTurnIndex: 0,
-      currentRevealingPlayer: 0,
-      results: null,
-    })
-  },
+      fetchResults: async () => {
+        const { roomId } = get()
+        if (!roomId) return
+        const data = await fetchJson<GameResults>("/api/game/results", { roomId })
+        set({ results: data, theme: data.theme })
+      },
 
-  resetGame: async () => {
-    const { roomId, playerId } = get()
-    if (roomId && playerId) {
-      await supabase.from("players").delete().eq("id", playerId)
-    }
-    roomChannel?.unsubscribe()
-    playersChannel?.unsubscribe()
-    roomChannel = null
-    playersChannel = null
-    set(initialState)
-  },
-}))
+      resetToLobby: async () => {
+        const { roomId } = get()
+        if (!roomId) return
+        await fetchJson<{ ok: true }>("/api/game/reset", { roomId })
+        set(initialState)
+      },
+
+      resetGame: async () => {
+        const { roomId, playerId } = get()
+        if (roomId && playerId) {
+          await fetchJson<{ ok: true }>("/api/rooms/leave", { roomId, playerId })
+        }
+        roomChannel?.unsubscribe()
+        playersChannel?.unsubscribe()
+        roomChannel = null
+        playersChannel = null
+        set(initialState)
+      },
+    }),
+    {
+      name: "impostor-session",
+      partialize: (state) => ({
+        roomId: state.roomId,
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      }),
+    },
+  ),
+)

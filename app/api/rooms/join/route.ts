@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -20,6 +20,14 @@ export async function POST(request: Request) {
 
   if (roomError || !room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  }
+
+  const { data: existingPlayer } = await supabaseAdmin
+    .from("players")
+    .select("id")\n    .eq("room_id", room.id)\n    .ilike("name", name)\n    .limit(1)\n    .maybeSingle()
+
+  if (existingPlayer) {
+    return NextResponse.json({ roomId: room.id, roomCode: room.code, playerId: existingPlayer.id })
   }
 
   const { data: player, error: playerError } = await supabaseAdmin

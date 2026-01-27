@@ -11,19 +11,27 @@ export default function RoundPage() {
   const router = useRouter()
   const {
     roomCode,
+    roomId,
     players,
     turnOrder,
     currentTurnIndex,
     status,
     nextTurn,
     playerId,
+    resumeSession,
   } = useGameStore()
 
   useEffect(() => {
-    if (!roomCode) {
+    if (!roomCode && roomId && playerId && players.length === 0) {
+      resumeSession()
+    }
+  }, [roomCode, roomId, playerId, players.length, resumeSession])
+
+  useEffect(() => {
+    if (!roomCode && !roomId) {
       router.push("/")
     }
-  }, [roomCode, router])
+  }, [roomCode, roomId, router])
 
   useEffect(() => {
     if (status === "voting") {
@@ -70,7 +78,8 @@ export default function RoundPage() {
               <h2 className="text-3xl font-bold text-foreground mt-2">{currentPlayer?.name}</h2>
             </div>
             <p className="text-sm text-muted-foreground text-center text-balance max-w-xs">
-              Fale algo relacionado ao tema (ou finja, se for o impostor). Os outros jogadores vão`n              prestar atenção em você!
+              Fale algo relacionado ao tema (ou finja, se for o impostor). Os outros jogadores vão
+              prestar atenção em você!
             </p>
           </CardContent>
         </Card>

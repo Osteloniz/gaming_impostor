@@ -11,6 +11,7 @@ export default function ResultsPage() {
   const router = useRouter()
   const {
     roomCode,
+    roomId,
     players,
     status,
     results,
@@ -18,16 +19,27 @@ export default function ResultsPage() {
     resetToLobby,
     resetGame,
     playerId,
+    resumeSession,
   } = useGameStore()
 
   const localPlayer = players.find((player) => player.id === playerId)
   const isHost = localPlayer?.isHost
 
   useEffect(() => {
-    if (!roomCode || status !== "results") {
+    if (!roomCode && roomId && playerId && players.length === 0) {
+      resumeSession()
+    }
+  }, [roomCode, roomId, playerId, players.length, resumeSession])
+
+  useEffect(() => {
+    if (!roomCode && !roomId) {
+      router.push("/")
+      return
+    }
+    if (status !== "results" && roomCode) {
       router.push("/")
     }
-  }, [roomCode, status, router])
+  }, [roomCode, roomId, status, router])
 
   useEffect(() => {
     if (status === "results" && !results) {
@@ -50,7 +62,7 @@ export default function ResultsPage() {
   const handlePlayAgain = async () => {
     if (!isHost) return
     await resetToLobby()
-    router.push("/lobby")
+    router.push("/")
   }
 
   const handleGoHome = async () => {

@@ -1,0 +1,251 @@
+"use client"
+
+import { create } from "zustand"
+import type { GameState, Player, GameResults, CardRole } from "./types"
+import { supabase } from "@/lib/supabase/client"
+
+interface GameStore extends GameState {
+  createRoom: (hostName: string) => Promise<void>
+  joinRoom: (playerName: string, roomCode: string) => Promise<void>
+  startGame: () => Promise<void>
+  markCardSeen: () => Promise<void>
+  fetchMyCard: () => Promise<void>
+  nextTurn: () => Promise<void>
+  castVote: (votedForId: string) => Promise<void>
+  fetchResults: () => Promise<void>
+  resetToLobby: () => Promise<void>
+  resetGame: () => Promise<void>
+}
+
+const initialState: GameState = {
+  roomId: "",
+  roomCode: "",
+  playerId: "",
+  status: "lobby",
+  players: [],
+  theme: null,
+  cardRole: null,
+  turnOrder: [],
+  currentTurnIndex: 0,
+  currentRevealingPlayer: 0,
+  results: null,
+}
+
+type RoomRow = {
+  id: string
+  code: string
+  status: GameState["status"]
+  host_player_id: string | null
+  turn_order: string[] | null
+  current_turn_index: number | null
+  current_revealing_player: number | null
+}
+
+type PlayerRow = {
+  id: string
+  name: string
+  is_host: boolean
+  has_seen_card: boolean
+  voted_for: string | null
+}
+
+let roomChannel: ReturnType<typeof supabase.channel> | null = null
+let playersChannel: ReturnType<typeof supabase.channel> | null = null
+
+const fetchJson = async <T,>(url: string, body: Record<string, unknown>): Promise<T> => {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const message = await res.text()
+    throw new Error(message || `Request failed: ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+const mapPlayers = (rows: PlayerRow[]): Player[] =>
+  rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    isHost: row.is_host,
+    hasSeenCard: row.has_seen_card,
+    votedFor: row.voted_for,
+  }))
+
+const hydrateRoom = async (
+  roomId: string,
+  roomCode: string,
+  playerId: string,
+  setState: (partial: Partial<GameState>) => void,
+) => {
+  const { data: room, error: roomError } = await supabase
+    .from("rooms")
+    .select("id, code, status, host_player_id, turn_order, current_turn_index, current_revealing_player")
+    .eq("id", roomId)
+    .single()
+
+  if (roomError || !room) {
+    throw new Error(roomError?.message || "Room not found")
+  }
+
+  const { data: players, error: playersError } = await supabase
+    .from("players")
+    .select("id, name, is_host, has_seen_card, voted_for")
+    .eq("room_id", roomId)
+    .order("created_at")
+
+  if (playersError || !players) {
+    throw new Error(playersError?.message || "Players not found")
+  }
+
+  setState({
+    roomId,
+    roomCode: room.code || roomCode,
+    playerId,
+    status: room.status,
+    turnOrder: room.turn_order || [],
+    currentTurnIndex: room.current_turn_index ?? 0,
+    currentRevealingPlayer: room.current_revealing_player ?? 0,
+    players: mapPlayers(players as PlayerRow[]),
+  })
+
+  roomChannel?.unsubscribe()
+  playersChannel?.unsubscribe()
+
+  roomChannel = supabase
+    .channel(`room:${roomId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "rooms", filter: `id=eq.${roomId}` },
+      (payload) => {
+        const next = payload.new as RoomRow
+        setState({
+          status: next.status,
+          turnOrder: next.turn_order || [],
+          currentTurnIndex: next.current_turn_index ?? 0,
+          currentRevealingPlayer: next.current_revealing_player ?? 0,
+          roomCode: next.code,
+        })
+      },
+    )
+    .subscribe()
+
+  playersChannel = supabase
+    .channel(`players:${roomId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "players", filter: `room_id=eq.${roomId}` },
+      async () => {
+        const { data } = await supabase
+          .from("players")
+          .select("id, name, is_host, has_seen_card, voted_for")
+          .eq("room_id", roomId)
+          .order("created_at")
+
+        if (data) {
+          setState({ players: mapPlayers(data as PlayerRow[]) })
+        }
+      },
+    )
+    .subscribe()
+}
+
+export const useGameStore = create<GameStore>((set, get) => ({
+  ...initialState,
+
+  createRoom: async (hostName: string) => {
+    const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
+      "/api/rooms/create",
+      { name: hostName },
+    )
+    await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
+  },
+
+  joinRoom: async (playerName: string, roomCode: string) => {
+    const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
+      "/api/rooms/join",
+      { name: playerName, code: roomCode },
+    )
+    await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
+  },
+
+  startGame: async () => {
+    const { roomId } = get()
+    if (!roomId) return
+    await fetchJson<{ ok: true }>("/api/game/start", { roomId })
+    set({ theme: null, cardRole: null, results: null })
+  },
+
+  markCardSeen: async () => {
+    const { roomId, playerId } = get()
+    if (!roomId || !playerId) return
+    await fetchJson<{ ok: true }>("/api/game/ready", { roomId, playerId })
+  },
+
+  fetchMyCard: async () => {
+    const { roomId, playerId } = get()
+    if (!roomId || !playerId) return
+    const data = await fetchJson<{ role: CardRole; theme: string | null }>(
+      "/api/game/my-card",
+      { roomId, playerId },
+    )
+    set({ cardRole: data.role, theme: data.theme })
+  },
+
+  nextTurn: async () => {
+    const { roomId, currentTurnIndex, turnOrder } = get()
+    if (!roomId || turnOrder.length === 0) return
+    const isLast = currentTurnIndex >= turnOrder.length - 1
+    const updates = isLast
+      ? { status: "voting", current_turn_index: 0 }
+      : { current_turn_index: currentTurnIndex + 1 }
+
+    await supabase.from("rooms").update(updates).eq("id", roomId)
+  },
+
+  castVote: async (votedForId: string) => {
+    const { roomId, playerId } = get()
+    if (!roomId || !playerId) return
+    await fetchJson<{ ok: true }>("/api/game/vote", {
+      roomId,
+      voterId: playerId,
+      votedForId,
+    })
+  },
+
+  fetchResults: async () => {
+    const { roomId } = get()
+    if (!roomId) return
+    const data = await fetchJson<GameResults>("/api/game/results", { roomId })
+    set({ results: data, theme: data.theme })
+  },
+
+  resetToLobby: async () => {
+    const { roomId } = get()
+    if (!roomId) return
+    await fetchJson<{ ok: true }>("/api/game/reset", { roomId })
+    set({
+      status: "lobby",
+      theme: null,
+      cardRole: null,
+      turnOrder: [],
+      currentTurnIndex: 0,
+      currentRevealingPlayer: 0,
+      results: null,
+    })
+  },
+
+  resetGame: async () => {
+    const { roomId, playerId } = get()
+    if (roomId && playerId) {
+      await supabase.from("players").delete().eq("id", playerId)
+    }
+    roomChannel?.unsubscribe()
+    playersChannel?.unsubscribe()
+    roomChannel = null
+    playersChannel = null
+    set(initialState)
+  },
+}))

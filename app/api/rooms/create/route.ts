@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase/server"
 import { generateRoomCode } from "@/lib/game/types"
 
@@ -13,6 +13,7 @@ export async function POST(request: Request) {
   }
 
   let room: { id: string; code: string } | null = null
+  let lastError: string | null = null
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateRoomCode()
@@ -26,10 +27,12 @@ export async function POST(request: Request) {
       room = data
       break
     }
+
+    lastError = error?.message || "Unknown error"
   }
 
   if (!room) {
-    return NextResponse.json({ error: "Failed to create room" }, { status: 500 })
+    return NextResponse.json({ error: `Failed to create room: ${lastError}` }, { status: 500 })
   }
 
   const { data: player, error: playerError } = await supabaseAdmin
@@ -39,10 +42,23 @@ export async function POST(request: Request) {
     .single()
 
   if (playerError || !player) {
-    return NextResponse.json({ error: "Failed to create player" }, { status: 500 })
+    return NextResponse.json(
+      { error: `Failed to create player: ${playerError?.message || "unknown"}` },
+      { status: 500 },
+    )
   }
 
-  await supabaseAdmin.from("rooms").update({ host_player_id: player.id }).eq("id", room.id)
+  const { error: hostError } = await supabaseAdmin
+    .from("rooms")
+    .update({ host_player_id: player.id })
+    .eq("id", room.id)
+
+  if (hostError) {
+    return NextResponse.json(
+      { error: `Failed to set host: ${hostError.message}` },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json({ roomId: room.id, roomCode: room.code, playerId: player.id })
 }

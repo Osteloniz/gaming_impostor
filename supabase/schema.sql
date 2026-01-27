@@ -38,7 +38,7 @@ create index if not exists players_room_id_idx on public.players(room_id);
 create index if not exists rooms_code_idx on public.rooms(code);
 
 insert into public.themes (text, category, active) values
- ('Praia', 'geral', true),
+('Praia', 'geral', true),
 ('Filmes de terror', 'filmes', true),
 ('Pizza', 'comida', true),
 ('Super-heróis', 'filmes', true),

@@ -24,7 +24,11 @@ export async function POST(request: Request) {
 
   const { data: existingPlayer } = await supabaseAdmin
     .from("players")
-    .select("id")\n    .eq("room_id", room.id)\n    .ilike("name", name)\n    .limit(1)\n    .maybeSingle()
+    .select("id")
+    .eq("room_id", room.id)
+    .ilike("name", name)
+    .limit(1)
+    .maybeSingle()
 
   if (existingPlayer) {
     return NextResponse.json({ roomId: room.id, roomCode: room.code, playerId: existingPlayer.id })

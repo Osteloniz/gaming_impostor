@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,12 +10,12 @@ import { Eye, Users, Sparkles, LogIn } from "lucide-react"
 
 export default function HomePage() {
   const [playerName, setPlayerName] = useState("")
-  const [roomCode, setRoomCode] = useState("")
+  const [roomCodeInput, setRoomCodeInput] = useState("")
   const [mode, setMode] = useState<"presencial" | "online">("presencial")
   const [rounds, setRounds] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { createRoom, joinRoom } = useGameStore()
+  const { createRoom, joinRoom, resumeSession, status, roomId, roomCode, playerId } = useGameStore()
 
   const handleCreateRoom = async () => {
     if (!playerName.trim()) return
@@ -29,15 +29,44 @@ export default function HomePage() {
   }
 
   const handleJoinRoom = async () => {
-    if (!playerName.trim() || !roomCode.trim()) return
+    if (!playerName.trim() || !roomCodeInput.trim()) return
     setIsLoading(true)
     try {
-      await joinRoom(playerName.trim(), roomCode.trim().toUpperCase())
+      await joinRoom(playerName.trim(), roomCodeInput.trim().toUpperCase())
       router.push("/lobby")
     } finally {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!roomCode && roomId && playerId) {
+      resumeSession()
+    }
+  }, [roomCode, roomId, playerId, resumeSession])
+
+  useEffect(() => {
+    if (!roomCode || !roomId || !playerId) return
+    if (status === "lobby") {
+      router.push("/lobby")
+      return
+    }
+    if (status === "revealing") {
+      router.push("/game/card")
+      return
+    }
+    if (status === "playing") {
+      router.push("/game/round")
+      return
+    }
+    if (status === "voting") {
+      router.push("/game/voting")
+      return
+    }
+    if (status === "results") {
+      router.push("/game/results")
+    }
+  }, [status, roomCode, roomId, playerId, router])
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
@@ -126,14 +155,14 @@ export default function HomePage() {
           <CardContent className="flex flex-col gap-4">
             <Input
               placeholder="Código da sala"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
+              value={roomCodeInput}
+              onChange={(e) => setRoomCodeInput(e.target.value)}
               className="h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
               maxLength={8}
             />
             <Button
               onClick={handleJoinRoom}
-              disabled={!playerName.trim() || !roomCode.trim() || isLoading}
+              disabled={!playerName.trim() || !roomCodeInput.trim() || isLoading}
               className="h-12 text-base font-medium bg-secondary hover:bg-secondary/90 text-secondary-foreground"
             >
               <LogIn className="w-5 h-5 mr-2" />

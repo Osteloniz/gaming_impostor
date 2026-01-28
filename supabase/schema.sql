@@ -46,9 +46,29 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.vote_requests (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  requester_player_id uuid not null references public.players(id) on delete cascade,
+  status text not null default 'pending',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.vote_responses (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  request_id uuid not null references public.vote_requests(id) on delete cascade,
+  player_id uuid not null references public.players(id) on delete cascade,
+  approved boolean not null,
+  created_at timestamptz not null default now(),
+  unique (request_id, player_id)
+);
+
 create index if not exists players_room_id_idx on public.players(room_id);
 create index if not exists rooms_code_idx on public.rooms(code);
 create index if not exists messages_room_id_round_idx on public.messages(room_id, round_number, created_at);
+create index if not exists vote_requests_room_id_idx on public.vote_requests(room_id, created_at);
+create index if not exists vote_responses_request_id_idx on public.vote_responses(request_id);
 
 insert into public.themes (text, category, active) values
 ('Praia', 'geral', true),

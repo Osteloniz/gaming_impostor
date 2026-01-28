@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -30,6 +30,13 @@ export default function RoundPage() {
     { id: string; text: string; player_id: string; created_at: string; round_number: number }[]
   >([])
   const [chatInput, setChatInput] = useState("")
+  const [voteRequest, setVoteRequest] = useState<{
+    id: string
+    requester_player_id: string
+    status: string
+  } | null>(null)
+  const [voteNotice, setVoteNotice] = useState<string | null>(null)
+  const lastTurnRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!roomCode && roomId && playerId && players.length === 0) {
@@ -54,6 +61,7 @@ export default function RoundPage() {
   const localPlayer = players.find((player) => player.id === playerId)
   const isHost = localPlayer?.isHost
   const canAdvance = mode === "presencial" ? isHost || currentPlayerId === playerId : isHost
+  const isMyTurn = currentPlayerId === playerId
 
   const getPlayerByOrder = (index: number) => {
     const playerIdByOrder = turnOrder[index]
@@ -62,7 +70,7 @@ export default function RoundPage() {
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null
-    const loadMessages = async () => {
+    const loadRoundData = async () => {
       if (!roomId) return
       const { data } = await supabase
         .from("messages")
@@ -70,13 +78,61 @@ export default function RoundPage() {
         .eq("room_id", roomId)
         .order("created_at", { ascending: true })
       if (data) setChatMessages(data)
+
+      const { data: request } = await supabase
+        .from("vote_requests")
+        .select("id, requester_player_id, status, created_at")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (request && request.status === "pending") {
+        setVoteRequest({
+          id: request.id,
+          requester_player_id: request.requester_player_id,
+          status: request.status,
+        })
+      } else {
+        setVoteRequest(null)
+        if (request?.status === "denied" && request.requester_player_id === playerId) {
+          setVoteNotice("Pedido de votação recusado.")
+          setTimeout(() => setVoteNotice(null), 3000)
+        }
+      }
     }
-    loadMessages()
-    timer = setInterval(loadMessages, 2000)
+    loadRoundData()
+    timer = setInterval(loadRoundData, 2000)
     return () => {
       if (timer) clearInterval(timer)
     }
-  }, [roomId, currentRound])
+  }, [roomId, currentRound, playerId])
+
+  useEffect(() => {
+    if (!currentPlayerId) return
+    if (currentPlayerId !== lastTurnRef.current) {
+      lastTurnRef.current = currentPlayerId
+      if (currentPlayerId === playerId) {
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+          const oscillator = audioContext.createOscillator()
+          const gain = audioContext.createGain()
+          oscillator.type = "sine"
+          oscillator.frequency.value = 880
+          gain.gain.value = 0.05
+          oscillator.connect(gain)
+          gain.connect(audioContext.destination)
+          oscillator.start()
+          setTimeout(() => {
+            oscillator.stop()
+            audioContext.close()
+          }, 200)
+        } catch {
+          // ignore audio errors
+        }
+      }
+    }
+  }, [currentPlayerId, playerId])
 
   const handleSendMessage = async () => {
     if (!chatInput.trim() || !roomId || !playerId || playerId !== currentPlayerId) return
@@ -87,12 +143,37 @@ export default function RoundPage() {
       round_number: currentRound,
     })
     setChatInput("")
-    await nextTurn()
+    if (mode === "online") {
+      await nextTurn()
+    }
   }
 
   const handleForceVoting = async () => {
     if (!isHost || !roomId) return
     await supabase.from("rooms").update({ status: "voting" }).eq("id", roomId)
+  }
+
+  const handleRequestVote = async () => {
+    if (!roomId || !playerId || voteRequest) return
+    await fetch("/api/game/request-vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId, playerId }),
+    })
+  }
+
+  const handleRespondVote = async (approved: boolean) => {
+    if (!voteRequest || !roomId || !playerId) return
+    await fetch("/api/game/respond-vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId,
+        playerId,
+        requestId: voteRequest.id,
+        approved,
+      }),
+    })
   }
 
   const playersById = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p.name])), [players])
@@ -127,6 +208,11 @@ export default function RoundPage() {
             <div className="text-center">
               <p className="text-sm text-muted-foreground uppercase tracking-wider">Agora é a vez de</p>
               <h2 className="text-3xl font-bold text-foreground mt-2">{currentPlayer?.name}</h2>
+              {isMyTurn && (
+                <span className="inline-flex mt-2 px-3 py-1 rounded-full text-xs font-semibold bg-primary text-primary-foreground">
+                  Sua vez!
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted-foreground text-center text-balance max-w-xs">
               Fale algo relacionado ao tema (ou finja, se for o impostor). Os outros jogadores vão
@@ -255,6 +341,41 @@ export default function RoundPage() {
             )
           })()}
         </Button>
+
+        <Button
+          onClick={handleRequestVote}
+          variant="secondary"
+          className="w-full"
+          disabled={Boolean(voteRequest)}
+        >
+          Solicitar votação
+        </Button>
+
+        {voteRequest && (
+          <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
+            <CardContent className="pt-4 pb-4 flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">
+                {voteRequest.requester_player_id === playerId
+                  ? "Você solicitou votação. Aguardando respostas..."
+                  : `${playersById[voteRequest.requester_player_id] || "Alguém"} pediu votação.`}
+              </p>
+              {voteRequest.requester_player_id !== playerId && (
+                <div className="flex gap-2">
+                  <Button onClick={() => handleRespondVote(true)} className="flex-1">
+                    Aprovar
+                  </Button>
+                  <Button onClick={() => handleRespondVote(false)} variant="outline" className="flex-1">
+                    Recusar
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {voteNotice && (
+          <p className="text-xs text-muted-foreground text-center">{voteNotice}</p>
+        )}
 
         {isHost && (
           <Button

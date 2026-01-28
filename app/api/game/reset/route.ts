@@ -12,6 +12,8 @@ export async function POST(request: Request) {
   }
 
   await supabaseAdmin.from("messages").delete().eq("room_id", roomId)
+  await supabaseAdmin.from("vote_responses").delete().eq("room_id", roomId)
+  await supabaseAdmin.from("vote_requests").delete().eq("room_id", roomId)
   await supabaseAdmin.from("players").delete().eq("room_id", roomId)
   await supabaseAdmin.from("rooms_private").delete().eq("room_id", roomId)
   await supabaseAdmin.from("rooms").delete().eq("id", roomId)

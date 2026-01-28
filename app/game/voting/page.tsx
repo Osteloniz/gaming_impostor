@@ -1,14 +1,18 @@
 ﻿"use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useGameStore } from "@/lib/game/store"
 import { Vote, User, Check } from "lucide-react"
+import { supabase } from "@/lib/supabase/client"
 
 export default function VotingPage() {
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
+  const [messages, setMessages] = useState<
+    { id: string; text: string; player_id: string; created_at: string; round_number: number }[]
+  >([])
   const router = useRouter()
   const { roomCode, roomId, players, status, castVote, playerId, resumeSession } = useGameStore()
 
@@ -33,6 +37,24 @@ export default function VotingPage() {
     }
   }, [status, router])
 
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null
+    const loadMessages = async () => {
+      if (!roomId) return
+      const { data } = await supabase
+        .from("messages")
+        .select("id, text, player_id, created_at, round_number")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: true })
+      if (data) setMessages(data)
+    }
+    loadMessages()
+    timer = setInterval(loadMessages, 2000)
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [roomId])
+
   const handleConfirmVote = async () => {
     if (!selectedVote) return
     await castVote(selectedVote)
@@ -40,6 +62,8 @@ export default function VotingPage() {
   }
 
   const otherPlayers = players.filter((player) => player.id !== currentPlayer?.id)
+  const missingVoters = players.filter((player) => !player.votedFor).map((player) => player.name)
+  const playersById = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p.name])), [players])
 
   if (!roomCode || !currentPlayer) {
     return null
@@ -63,6 +87,27 @@ export default function VotingPage() {
 
         {!hasVoted ? (
           <>
+            {messages.length > 0 && (
+              <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-card-foreground">Histórico de dicas</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                  {messages.map((msg) => (
+                    <div key={msg.id} className="flex flex-col bg-secondary/50 rounded-md px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {playersById[msg.player_id] || "Jogador"}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">R{msg.round_number}</span>
+                      </div>
+                      <span className="text-sm text-foreground break-words">{msg.text}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg text-card-foreground">Quem você acha que é o impostor?</CardTitle>
@@ -109,19 +154,31 @@ export default function VotingPage() {
               <Vote className="w-5 h-5 mr-2" />
               Confirmar Voto
             </Button>
+            {missingVoters.length > 0 && (
+              <p className="text-xs text-muted-foreground text-center">
+                Faltando votar: {missingVoters.join(", ")}
+              </p>
+            )}
           </>
         ) : (
-          <Card className="w-full bg-accent/10 border-accent/30">
-            <CardContent className="flex flex-col items-center gap-4 py-8">
-              <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
-                <Check className="w-8 h-8 text-accent" />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-foreground">Voto registrado!</h3>
-                <p className="text-muted-foreground mt-2">Aguardando os outros jogadores...</p>
-              </div>
-            </CardContent>
-          </Card>
+          <>
+            <Card className="w-full bg-accent/10 border-accent/30">
+              <CardContent className="flex flex-col items-center gap-4 py-8">
+                <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
+                  <Check className="w-8 h-8 text-accent" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-foreground">Voto registrado!</h3>
+                  <p className="text-muted-foreground mt-2">Aguardando os outros jogadores...</p>
+                </div>
+              </CardContent>
+            </Card>
+            {missingVoters.length > 0 && (
+              <p className="text-xs text-muted-foreground text-center">
+                Faltando votar: {missingVoters.join(", ")}
+              </p>
+            )}
+          </>
         )}
 
         <p className="text-xs text-muted-foreground text-center">

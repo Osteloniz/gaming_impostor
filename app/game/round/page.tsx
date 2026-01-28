@@ -183,17 +183,32 @@ export default function RoundPage() {
           size="lg"
           className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-primary-foreground"
         >
-          {currentTurnIndex < turnOrder.length - 1 ? (
-            <>
-              Próximo Jogador
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </>
-          ) : (
-            <>
-              Ir para Votação
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </>
-          )}
+          {(() => {
+            const isLastInTurn = currentTurnIndex >= turnOrder.length - 1
+            if (!isLastInTurn) {
+              return (
+                <>
+                  Próximo Jogador
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </>
+              )
+            }
+            const isLastRound = currentRound >= totalRounds
+            if (isLastRound) {
+              return (
+                <>
+                  Ir para Votação
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </>
+              )
+            }
+            return (
+              <>
+                Próxima Rodada
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </>
+            )
+          })()}
         </Button>
 
         {isHost && (

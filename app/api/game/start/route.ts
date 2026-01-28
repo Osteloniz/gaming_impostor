@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     .from("rooms")
     .update({
       status: "revealing",
+      current_round: 1,
       turn_order: turnOrder,
       current_turn_index: 0,
       current_revealing_player: 0,

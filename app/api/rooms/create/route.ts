@@ -7,6 +7,8 @@ export const runtime = "nodejs"
 export async function POST(request: Request) {
   const body = await request.json()
   const name = typeof body?.name === "string" ? body.name.trim() : ""
+  const mode = body?.mode === "online" ? "online" : "presencial"
+  const totalRounds = Number.isFinite(body?.totalRounds) && body.totalRounds > 0 ? Math.floor(body.totalRounds) : 1
 
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 })
@@ -19,7 +21,7 @@ export async function POST(request: Request) {
     const code = generateRoomCode()
     const { data, error } = await supabaseAdmin
       .from("rooms")
-      .insert({ code, status: "lobby" })
+      .insert({ code, status: "lobby", mode, total_rounds: totalRounds, current_round: 1 })
       .select("id, code")
       .single()
 

@@ -11,6 +11,8 @@ import { Eye, Users, Sparkles, LogIn } from "lucide-react"
 export default function HomePage() {
   const [playerName, setPlayerName] = useState("")
   const [roomCode, setRoomCode] = useState("")
+  const [mode, setMode] = useState<"presencial" | "online">("presencial")
+  const [rounds, setRounds] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { createRoom, joinRoom } = useGameStore()
@@ -19,7 +21,7 @@ export default function HomePage() {
     if (!playerName.trim()) return
     setIsLoading(true)
     try {
-      await createRoom(playerName.trim())
+      await createRoom(playerName.trim(), mode, rounds || 1)
       router.push("/lobby")
     } finally {
       setIsLoading(false)
@@ -71,6 +73,40 @@ export default function HomePage() {
               className="h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
               maxLength={20}
             />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <label className="font-medium text-foreground">Modalidade:</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode("presencial")}
+                  className={`px-3 py-1 rounded-md border ${
+                    mode === "presencial" ? "bg-primary text-primary-foreground border-primary" : "border-border"
+                  }`}
+                >
+                  Presencial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("online")}
+                  className={`px-3 py-1 rounded-md border ${
+                    mode === "online" ? "bg-primary text-primary-foreground border-primary" : "border-border"
+                  }`}
+                >
+                  Online
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-muted-foreground w-24">Rodadas:</label>
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={rounds}
+                onChange={(e) => setRounds(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+                className="w-24"
+              />
+            </div>
             <Button
               onClick={handleCreateRoom}
               disabled={!playerName.trim() || isLoading}

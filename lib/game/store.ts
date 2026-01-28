@@ -6,7 +6,7 @@ import type { GameState, Player, GameResults, CardRole } from "./types"
 import { supabase } from "@/lib/supabase/client"
 
 interface GameStore extends GameState {
-  createRoom: (hostName: string) => Promise<void>
+  createRoom: (hostName: string, mode: GameState["mode"], totalRounds: number) => Promise<void>
   joinRoom: (playerName: string, roomCode: string) => Promise<void>
   resumeSession: () => Promise<void>
   startGame: () => Promise<void>
@@ -24,6 +24,9 @@ const initialState: GameState = {
   roomCode: "",
   playerId: "",
   status: "lobby",
+  mode: "presencial",
+  totalRounds: 1,
+  currentRound: 1,
   players: [],
   theme: null,
   cardRole: null,
@@ -38,6 +41,9 @@ type RoomRow = {
   code: string
   status: GameState["status"]
   host_player_id: string | null
+  mode?: GameState["mode"]
+  total_rounds?: number | null
+  current_round?: number | null
   turn_order: string[] | null
   current_turn_index: number | null
   current_revealing_player: number | null
@@ -115,6 +121,9 @@ const hydrateRoom = async (
     roomCode: room.code || roomCode,
     playerId,
     status: room.status,
+    mode: (room.mode as GameState["mode"]) || "presencial",
+    totalRounds: room.total_rounds ?? 1,
+    currentRound: room.current_round ?? 1,
     turnOrder: room.turn_order || [],
     currentTurnIndex: room.current_turn_index ?? 0,
     currentRevealingPlayer: room.current_revealing_player ?? 0,
@@ -138,6 +147,9 @@ const hydrateRoom = async (
         const next = payload.new as RoomRow
         setState({
           status: next.status,
+          mode: (next.mode as GameState["mode"]) || "presencial",
+          totalRounds: next.total_rounds ?? 1,
+          currentRound: next.current_round ?? 1,
           turnOrder: next.turn_order || [],
           currentTurnIndex: next.current_turn_index ?? 0,
           currentRevealingPlayer: next.current_revealing_player ?? 0,
@@ -183,6 +195,9 @@ const hydrateRoom = async (
       if (refreshedRoom) {
         setState({
           status: refreshedRoom.status,
+          mode: (refreshedRoom.mode as GameState["mode"]) || "presencial",
+          totalRounds: refreshedRoom.total_rounds ?? 1,
+          currentRound: refreshedRoom.current_round ?? 1,
           turnOrder: refreshedRoom.turn_order || [],
           currentTurnIndex: refreshedRoom.current_turn_index ?? 0,
           currentRevealingPlayer: refreshedRoom.current_revealing_player ?? 0,
@@ -193,7 +208,7 @@ const hydrateRoom = async (
       if (refreshedPlayers) {
         setState({ players: mapPlayers(refreshedPlayers as PlayerRow[]) })
       }
-    }, 5000)
+    }, 2000)
   }
 }
 
@@ -202,10 +217,10 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       ...initialState,
 
-      createRoom: async (hostName: string) => {
+      createRoom: async (hostName: string, mode: GameState["mode"], totalRounds: number) => {
         const data = await fetchJson<{ roomId: string; roomCode: string; playerId: string }>(
           "/api/rooms/create",
-          { name: hostName },
+          { name: hostName, mode, totalRounds },
         )
         await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
       },
@@ -252,11 +267,13 @@ export const useGameStore = create<GameStore>()(
       },
 
       nextTurn: async () => {
-        const { roomId, currentTurnIndex, turnOrder } = get()
+        const { roomId, currentTurnIndex, turnOrder, currentRound, totalRounds } = get()
         if (!roomId || turnOrder.length === 0) return
         const isLast = currentTurnIndex >= turnOrder.length - 1
         const updates = isLast
-          ? { status: "voting", current_turn_index: 0 }
+          ? currentRound >= totalRounds
+            ? { status: "voting", current_turn_index: 0 }
+            : { current_turn_index: 0, current_round: currentRound + 1 }
           : { current_turn_index: currentTurnIndex + 1 }
 
         await supabase.from("rooms").update(updates).eq("id", roomId)

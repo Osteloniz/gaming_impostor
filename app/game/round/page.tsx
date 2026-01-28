@@ -1,11 +1,13 @@
 ﻿"use client"
 
-import { useEffect } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useGameStore } from "@/lib/game/store"
 import { Mic, ArrowRight, Users, CheckCircle2 } from "lucide-react"
+import { supabase } from "@/lib/supabase/client"
+import { Input } from "@/components/ui/input"
 
 export default function RoundPage() {
   const router = useRouter()
@@ -15,11 +17,17 @@ export default function RoundPage() {
     players,
     turnOrder,
     currentTurnIndex,
+    currentRound,
+    totalRounds,
+    mode,
     status,
     nextTurn,
     playerId,
     resumeSession,
   } = useGameStore()
+
+  const [chatMessages, setChatMessages] = useState<{ id: string; text: string; player_id: string; created_at: string }[]>([])
+  const [chatInput, setChatInput] = useState("")
 
   useEffect(() => {
     if (!roomCode && roomId && playerId && players.length === 0) {
@@ -43,11 +51,49 @@ export default function RoundPage() {
   const currentPlayer = players.find((player) => player.id === currentPlayerId)
   const localPlayer = players.find((player) => player.id === playerId)
   const isHost = localPlayer?.isHost
+  const canAdvance = mode === "presencial" ? isHost || currentPlayerId === playerId : isHost
 
   const getPlayerByOrder = (index: number) => {
     const playerIdByOrder = turnOrder[index]
     return players.find((player) => player.id === playerIdByOrder)
   }
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null
+    const loadMessages = async () => {
+      if (!roomId) return
+      const { data } = await supabase
+        .from("messages")
+        .select("id, text, player_id, created_at")
+        .eq("room_id", roomId)
+        .eq("round_number", currentRound)
+        .order("created_at", { ascending: true })
+      if (data) setChatMessages(data)
+    }
+    loadMessages()
+    timer = setInterval(loadMessages, 2000)
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [roomId, currentRound])
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || !roomId || !playerId) return
+    await supabase.from("messages").insert({
+      room_id: roomId,
+      player_id: playerId,
+      text: chatInput.trim(),
+      round_number: currentRound,
+    })
+    setChatInput("")
+  }
+
+  const handleForceVoting = async () => {
+    if (!isHost || !roomId) return
+    await supabase.from("rooms").update({ status: "voting" }).eq("id", roomId)
+  }
+
+  const playersById = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p.name])), [players])
 
   if (!roomCode) {
     return null
@@ -64,7 +110,7 @@ export default function RoundPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground">Rodada de Fala</h1>
           <p className="text-muted-foreground mt-1">
-            Turno {currentTurnIndex + 1} de {turnOrder.length}
+            Rodada {currentRound} de {totalRounds} · Turno {currentTurnIndex + 1} de {turnOrder.length}
           </p>
         </div>
 
@@ -133,7 +179,7 @@ export default function RoundPage() {
 
         <Button
           onClick={nextTurn}
-          disabled={!isHost}
+          disabled={!canAdvance}
           size="lg"
           className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-primary-foreground"
         >
@@ -150,8 +196,58 @@ export default function RoundPage() {
           )}
         </Button>
 
-        {!isHost && (
-          <p className="text-xs text-muted-foreground text-center">Aguardando o host avançar a rodada</p>
+        {isHost && (
+          <Button
+            onClick={handleForceVoting}
+            variant="outline"
+            className="w-full"
+          >
+            Iniciar votação agora
+          </Button>
+        )}
+
+        {!canAdvance && (
+          <p className="text-xs text-muted-foreground text-center">
+            {mode === "presencial"
+              ? "Aguardando o jogador da vez ou o host avançar"
+              : "Aguardando o host avançar a rodada"}
+          </p>
+        )}
+
+        {mode === "online" && (
+          <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
+            <CardContent className="pt-4 pb-4 flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Chat da rodada</span>
+                <span className="text-xs text-muted-foreground">apaga ao trocar de rodada</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {chatMessages.map((msg) => (
+                  <div key={msg.id} className="flex flex-col bg-secondary/50 rounded-md px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {playersById[msg.player_id] || "Jogador"}
+                    </span>
+                    <span className="text-sm text-foreground break-words">{msg.text}</span>
+                  </div>
+                ))}
+                {chatMessages.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sem mensagens nesta rodada.</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Dica rápida..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  className="flex-1"
+                />
+                <Button onClick={handleSendMessage} disabled={!chatInput.trim()}>
+                  Enviar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </main>

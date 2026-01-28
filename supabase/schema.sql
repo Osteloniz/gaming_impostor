@@ -5,6 +5,9 @@ create table if not exists public.rooms (
   code text not null unique,
   status text not null default 'lobby',
   host_player_id uuid,
+  mode text not null default 'presencial',
+  total_rounds integer not null default 1,
+  current_round integer not null default 1,
   turn_order jsonb,
   current_turn_index integer not null default 0,
   current_revealing_player integer not null default 0,
@@ -34,8 +37,18 @@ create table if not exists public.rooms_private (
   impostor_player_id uuid references public.players(id)
 );
 
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  player_id uuid not null references public.players(id) on delete cascade,
+  round_number integer not null default 1,
+  text text not null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists players_room_id_idx on public.players(room_id);
 create index if not exists rooms_code_idx on public.rooms(code);
+create index if not exists messages_room_id_round_idx on public.messages(room_id, round_number, created_at);
 
 insert into public.themes (text, category, active) values
 ('Praia', 'geral', true),

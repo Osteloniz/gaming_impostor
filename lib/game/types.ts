@@ -28,6 +28,9 @@ export interface GameState {
   roomCode: string
   playerId: string
   status: GameStatus
+  mode: "presencial" | "online"
+  totalRounds: number
+  currentRound: number
   players: Player[]
   theme: string | null
   cardRole: CardRole | null

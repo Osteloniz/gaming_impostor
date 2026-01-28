@@ -98,7 +98,9 @@ const hydrateRoom = async (
 ) => {
   const { data: room, error: roomError } = await supabase
     .from("rooms")
-    .select("id, code, status, host_player_id, turn_order, current_turn_index, current_revealing_player")
+    .select(
+      "id, code, status, host_player_id, mode, total_rounds, current_round, turn_order, current_turn_index, current_revealing_player",
+    )
     .eq("id", roomId)
     .single()
 
@@ -182,7 +184,9 @@ const hydrateRoom = async (
     pollingTimer = setInterval(async () => {
       const { data: refreshedRoom } = await supabase
         .from("rooms")
-        .select("id, code, status, host_player_id, turn_order, current_turn_index, current_revealing_player")
+        .select(
+          "id, code, status, host_player_id, mode, total_rounds, current_round, turn_order, current_turn_index, current_revealing_player",
+        )
         .eq("id", roomId)
         .single()
 

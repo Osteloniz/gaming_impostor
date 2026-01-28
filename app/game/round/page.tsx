@@ -26,7 +26,9 @@ export default function RoundPage() {
     resumeSession,
   } = useGameStore()
 
-  const [chatMessages, setChatMessages] = useState<{ id: string; text: string; player_id: string; created_at: string }[]>([])
+  const [chatMessages, setChatMessages] = useState<
+    { id: string; text: string; player_id: string; created_at: string; round_number: number }[]
+  >([])
   const [chatInput, setChatInput] = useState("")
 
   useEffect(() => {
@@ -64,9 +66,8 @@ export default function RoundPage() {
       if (!roomId) return
       const { data } = await supabase
         .from("messages")
-        .select("id, text, player_id, created_at")
+        .select("id, text, player_id, created_at, round_number")
         .eq("room_id", roomId)
-        .eq("round_number", currentRound)
         .order("created_at", { ascending: true })
       if (data) setChatMessages(data)
     }
@@ -78,7 +79,7 @@ export default function RoundPage() {
   }, [roomId, currentRound])
 
   const handleSendMessage = async () => {
-    if (!chatInput.trim() || !roomId || !playerId) return
+    if (!chatInput.trim() || !roomId || !playerId || playerId !== currentPlayerId) return
     await supabase.from("messages").insert({
       room_id: roomId,
       player_id: playerId,
@@ -86,6 +87,7 @@ export default function RoundPage() {
       round_number: currentRound,
     })
     setChatInput("")
+    await nextTurn()
   }
 
   const handleForceVoting = async () => {
@@ -109,6 +111,9 @@ export default function RoundPage() {
       <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-md pt-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground">Rodada de Fala</h1>
+          {localPlayer && (
+            <p className="text-sm text-muted-foreground mt-1">Você é: {localPlayer.name}</p>
+          )}
           <p className="text-muted-foreground mt-1">
             Rodada {currentRound} de {totalRounds} · Turno {currentTurnIndex + 1} de {turnOrder.length}
           </p>
@@ -129,6 +134,46 @@ export default function RoundPage() {
             </p>
           </CardContent>
         </Card>
+
+        {mode === "online" && (
+          <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
+            <CardContent className="pt-4 pb-4 flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Chat do tema</span>
+                <span className="text-xs text-muted-foreground">visível para todos</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {chatMessages.map((msg) => (
+                  <div key={msg.id} className="flex flex-col bg-secondary/50 rounded-md px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {playersById[msg.player_id] || "Jogador"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">R{msg.round_number}</span>
+                    </div>
+                    <span className="text-sm text-foreground break-words">{msg.text}</span>
+                  </div>
+                ))}
+                {chatMessages.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sem mensagens ainda.</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder={playerId === currentPlayerId ? "Digite sua dica..." : "Aguardando sua vez"}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  disabled={playerId !== currentPlayerId}
+                  className="flex-1"
+                />
+                <Button onClick={handleSendMessage} disabled={!chatInput.trim() || playerId !== currentPlayerId}>
+                  Enviar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
           <CardContent className="pt-4 pb-4">
@@ -227,42 +272,6 @@ export default function RoundPage() {
               ? "Aguardando o jogador da vez ou o host avançar"
               : "Aguardando o host avançar a rodada"}
           </p>
-        )}
-
-        {mode === "online" && (
-          <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
-            <CardContent className="pt-4 pb-4 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-muted-foreground">Chat da rodada</span>
-                <span className="text-xs text-muted-foreground">apaga ao trocar de rodada</span>
-              </div>
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {chatMessages.map((msg) => (
-                  <div key={msg.id} className="flex flex-col bg-secondary/50 rounded-md px-3 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {playersById[msg.player_id] || "Jogador"}
-                    </span>
-                    <span className="text-sm text-foreground break-words">{msg.text}</span>
-                  </div>
-                ))}
-                {chatMessages.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Sem mensagens nesta rodada.</p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Dica rápida..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                  className="flex-1"
-                />
-                <Button onClick={handleSendMessage} disabled={!chatInput.trim()}>
-                  Enviar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         )}
       </div>
     </main>

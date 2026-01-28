@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Room id is required" }, { status: 400 })
   }
 
+  await supabaseAdmin.from("messages").delete().eq("room_id", roomId)
   await supabaseAdmin.from("players").delete().eq("room_id", roomId)
   await supabaseAdmin.from("rooms_private").delete().eq("room_id", roomId)
   await supabaseAdmin.from("rooms").delete().eq("id", roomId)

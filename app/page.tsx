@@ -40,10 +40,10 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    if (!roomCode && roomId && playerId) {
+    if (roomId && playerId) {
       resumeSession()
     }
-  }, [roomCode, roomId, playerId, resumeSession])
+  }, [roomId, playerId, resumeSession])
 
   useEffect(() => {
     if (!roomCode || !roomId || !playerId) return

@@ -16,10 +16,10 @@ export default function LobbyPage() {
   const isHost = currentPlayer?.isHost
 
   useEffect(() => {
-    if (!roomCode && roomId && playerId && players.length === 0) {
+    if (roomId && playerId && players.length === 0) {
       resumeSession()
     }
-  }, [roomCode, roomId, playerId, players.length, resumeSession])
+  }, [roomId, playerId, players.length, resumeSession])
 
   useEffect(() => {
     if (!roomCode && !roomId) {

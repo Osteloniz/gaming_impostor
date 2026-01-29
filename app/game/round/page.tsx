@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { HelpDialog } from "@/components/help/help-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Mic, ArrowRight, Users, CheckCircle2 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
@@ -395,6 +396,18 @@ export default function RoundPage() {
           </p>
         )}
       </div>
+
+      <HelpDialog
+        title="Rodada de fala"
+        description="Cada jogador dá uma dica sobre o tema."
+        steps={[
+          "Veja quem está na vez e aguarde seu turno.",
+          "Quando for sua vez, escreva uma dica curta sobre o tema.",
+          "Evite palavras óbvias para não ajudar o impostor.",
+          "Depois de todos falarem, o jogo vai para a votação.",
+        ]}
+        tips={["Dicas curtas deixam o jogo mais rápido e divertido."]}
+      />
     </main>
   )
 }

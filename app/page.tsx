@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { HelpDialog } from "@/components/help/help-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Eye, Users, Sparkles, LogIn } from "lucide-react"
 
@@ -246,6 +247,18 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </div>
+
+      <HelpDialog
+        title="Como começar"
+        description="Ajuda rápida para criar ou entrar em uma sala."
+        steps={[
+          "Digite seu nome para identificar você na partida.",
+          "Escolha a modalidade e a quantidade de rodadas.",
+          "Toque em Criar Sala para gerar o código da partida.",
+          "Para entrar, informe seu nome e o código e toque em Entrar.",
+        ]}
+        tips={["Mínimo de 3 jogadores para iniciar a partida."]}
+      />
     </main>
   )
 }

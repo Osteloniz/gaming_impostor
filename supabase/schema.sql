@@ -37,6 +37,14 @@ create table if not exists public.rooms_private (
   impostor_player_id uuid references public.players(id)
 );
 
+create table if not exists public.room_rounds (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  theme_id uuid references public.themes(id),
+  impostor_player_id uuid references public.players(id),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.rooms(id) on delete cascade,
@@ -66,6 +74,7 @@ create table if not exists public.vote_responses (
 
 create index if not exists players_room_id_idx on public.players(room_id);
 create index if not exists rooms_code_idx on public.rooms(code);
+create index if not exists room_rounds_room_id_created_idx on public.room_rounds(room_id, created_at);
 create index if not exists messages_room_id_round_idx on public.messages(room_id, round_number, created_at);
 create index if not exists vote_requests_room_id_idx on public.vote_requests(room_id, created_at);
 create index if not exists vote_responses_request_id_idx on public.vote_responses(request_id);

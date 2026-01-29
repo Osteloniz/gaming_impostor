@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { HelpDialog } from "@/components/help/help-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Vote, User, Check } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
@@ -185,6 +186,18 @@ export default function VotingPage() {
           Certifique-se que apenas você está vendo a tela ao votar
         </p>
       </div>
+
+      <HelpDialog
+        title="Como votar"
+        description="Agora é hora de escolher o impostor."
+        steps={[
+          "Revise as dicas da rodada se precisar.",
+          "Selecione o jogador que você acha ser o impostor.",
+          "Toque em Confirmar Voto para registrar.",
+          "Aguarde todos votarem para ver o resultado.",
+        ]}
+        tips={["Seu voto é secreto. Não mostre a tela para outros jogadores."]}
+      />
     </main>
   )
 }

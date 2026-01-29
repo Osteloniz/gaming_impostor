@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { HelpDialog } from "@/components/help/help-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Trophy, Skull, RotateCcw, Home, MessageCircle, Users } from "lucide-react"
 
@@ -204,6 +205,18 @@ export default function ResultsPage() {
           </Button>
         </div>
       </div>
+
+      <HelpDialog
+        title="Resultados da rodada"
+        description="Veja quem era o impostor e decida o próximo passo."
+        steps={[
+          "Confira o impostor e o tema revelado.",
+          "Veja o resultado da votação dos jogadores.",
+          "Se for host, toque em Jogar Novamente para reiniciar.",
+          "Use Voltar ao Início para sair da sala.",
+        ]}
+        tips={["Jogar Novamente mantém a mesma sala e jogadores."]}
+      />
     </main>
   )
 }

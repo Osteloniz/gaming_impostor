@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { HelpDialog } from "@/components/help/help-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Eye, EyeOff, Skull, MessageCircle } from "lucide-react"
 
@@ -156,6 +157,18 @@ export default function CardRevealPage() {
           <p className="text-xs text-muted-foreground text-center">Aguardando os outros jogadores...</p>
         )}
       </div>
+
+      <HelpDialog
+        title="Sua carta secreta"
+        description="Cada jogador revela a carta só para si."
+        steps={[
+          "Garanta que ninguém esteja vendo sua tela.",
+          "Toque em Revelar Carta para ver seu papel.",
+          "Se for impostor, blefe sem entregar o tema.",
+          "Toque em Estou pronto para avisar que já viu a carta.",
+        ]}
+        tips={["Se não for impostor, fale do tema sem facilitar demais."]}
+      />
     </main>
   )
 }

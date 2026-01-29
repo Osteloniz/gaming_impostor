@@ -12,6 +12,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Room and player are required" }, { status: 400 })
   }
 
+  const { data: player, error: playerError } = await supabaseAdmin
+    .from("players")
+    .select("id, is_host")
+    .eq("id", playerId)
+    .eq("room_id", roomId)
+    .single()
+
+  if (playerError || !player) {
+    return NextResponse.json({ error: "Player not found" }, { status: 404 })
+  }
+
+  if (player.is_host) {
+    await supabaseAdmin.from("rooms").delete().eq("id", roomId)
+    return NextResponse.json({ ok: true })
+  }
+
   const { error: deleteError } = await supabaseAdmin
     .from("players")
     .delete()

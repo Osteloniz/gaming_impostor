@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { HelpDialog } from "@/components/help/help-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Users, Crown, Play, Copy, Check } from "lucide-react"
 
@@ -129,6 +130,18 @@ export default function LobbyPage() {
           </CardContent>
         </Card>
       </div>
+
+      <HelpDialog
+        title="O que fazer no lobby"
+        description="Organize a sala antes de começar."
+        steps={[
+          "Compartilhe o código da sala com os amigos.",
+          "Aguarde todos entrarem (mínimo 3 jogadores).",
+          "O host toca em Iniciar Jogo quando estiver tudo pronto.",
+          "Cada jogador usa seu próprio celular para ver a carta secreta.",
+        ]}
+        tips={["Apenas o host pode iniciar a partida."]}
+      />
     </main>
   )
 }

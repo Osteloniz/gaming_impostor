@@ -1,32 +1,41 @@
 import React from "react"
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import './globals.css'
+import type { Metadata } from "next"
+import { Geist, Geist_Mono } from "next/font/google"
+import { Analytics } from "@vercel/analytics/next"
+import { SwRegister } from "@/components/pwa/sw-register"
+import "./globals.css"
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const _geist = Geist({ subsets: ["latin"] })
+const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: 'Impostor - Party Game',
-  description: 'Descubra quem é o impostor! Um jogo de festa divertido para jogar com amigos.',
-  generator: 'v0.app',
+  applicationName: "ALIBI",
+  title: "ALIBI",
+  description: "Descubra quem e o impostor! Um jogo de festa divertido para jogar com amigos.",
+  generator: "v0.app",
+  manifest: "/manifest.webmanifest",
+  themeColor: "#121318",
+  appleWebApp: {
+    capable: true,
+    title: "ALIBI",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
+        url: "/icon-light-32x32.png",
+        media: "(prefers-color-scheme: light)",
       },
       {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
+        url: "/icon-dark-32x32.png",
+        media: "(prefers-color-scheme: dark)",
       },
       {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: "/icon.svg",
+        type: "image/svg+xml",
       },
     ],
-    apple: '/apple-icon.png',
+    apple: "/apple-icon.png",
   },
 }
 
@@ -39,6 +48,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         {children}
+        <SwRegister />
         <Analytics />
       </body>
     </html>

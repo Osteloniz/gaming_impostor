@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { HelpDialog } from "@/components/help/help-dialog"
+import { ExitActions } from "@/components/help/exit-actions"
 import { useGameStore } from "@/lib/game/store"
-import { Trophy, Skull, RotateCcw, Home, MessageCircle, Users } from "lucide-react"
+import { Trophy, Skull, RotateCcw, MessageCircle, Users } from "lucide-react"
 
 export default function ResultsPage() {
   const router = useRouter()
@@ -18,7 +19,6 @@ export default function ResultsPage() {
     results,
     fetchResults,
     resetToLobby,
-    resetGame,
     playerId,
     resumeSession,
   } = useGameStore()
@@ -63,11 +63,6 @@ export default function ResultsPage() {
   const handlePlayAgain = async () => {
     if (!isHost) return
     await resetToLobby()
-    router.push("/")
-  }
-
-  const handleGoHome = async () => {
-    await resetGame()
     router.push("/")
   }
 
@@ -194,15 +189,7 @@ export default function ResultsPage() {
           {!isHost && (
             <p className="text-center text-sm text-muted-foreground">Aguardando o host reiniciar a sala</p>
           )}
-          <Button
-            onClick={handleGoHome}
-            variant="outline"
-            size="lg"
-            className="h-12 bg-transparent border-border text-foreground hover:bg-secondary"
-          >
-            <Home className="w-5 h-5 mr-2" />
-            Voltar ao Início
-          </Button>
+          <ExitActions className="mt-1" />
         </div>
       </div>
 

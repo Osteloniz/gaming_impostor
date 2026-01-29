@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { HelpDialog } from "@/components/help/help-dialog"
+import { ExitActions } from "@/components/help/exit-actions"
+import { Input } from "@/components/ui/input"
 import { useGameStore } from "@/lib/game/store"
 import { Users, Crown, Play, Copy, Check } from "lucide-react"
 
 export default function LobbyPage() {
   const [copied, setCopied] = useState(false)
+  const [themeMode, setThemeMode] = useState<"random" | "custom">("random")
+  const [themeText, setThemeText] = useState("")
   const router = useRouter()
   const { roomCode, roomId, players, status, startGame, playerId, resumeSession } = useGameStore()
 
@@ -40,7 +44,8 @@ export default function LobbyPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const canStart = players.length >= 3 && isHost
+  const isCustomInvalid = themeMode === "custom" && !themeText.trim()
+  const canStart = players.length >= 3 && isHost && !isCustomInvalid
 
   if (!roomCode) {
     return null
@@ -105,7 +110,7 @@ export default function LobbyPage() {
 
         <div className="flex flex-col gap-3 w-full">
           <Button
-            onClick={startGame}
+            onClick={() => startGame({ themeMode, themeText })}
             disabled={!canStart}
             className="h-14 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
           >
@@ -120,7 +125,58 @@ export default function LobbyPage() {
               Adicione pelo menos {3 - players.length} jogador(es) para começar
             </p>
           )}
+          {isHost && isCustomInvalid && (
+            <p className="text-center text-sm text-muted-foreground">
+              Informe um tema para iniciar no modo personalizado
+            </p>
+          )}
         </div>
+
+        {isHost && (
+          <Card className="w-full bg-card/80 backdrop-blur-sm border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg text-card-foreground">Tema da partida</CardTitle>
+              <CardDescription>Escolha como o tema sera definido</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setThemeMode("random")}
+                  className={`h-10 px-4 rounded-md border ${
+                    themeMode === "random" ? "bg-primary text-primary-foreground border-primary" : "border-border"
+                  }`}
+                >
+                  Aleatorio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeMode("custom")}
+                  className={`h-10 px-4 rounded-md border ${
+                    themeMode === "custom" ? "bg-primary text-primary-foreground border-primary" : "border-border"
+                  }`}
+                >
+                  Digitar tema
+                </button>
+              </div>
+              {themeMode === "custom" && (
+                <div className="flex flex-col gap-2">
+                  <Input
+                    placeholder="Ex: Viagens internacionais"
+                    value={themeText}
+                    onChange={(event) => setThemeText(event.target.value)}
+                    maxLength={40}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se ja existir, sera usado. Caso contrario, sera salvo para futuras partidas.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <ExitActions className="mt-2" />
 
         <Card className="w-full bg-card/50 backdrop-blur-sm border-border">
           <CardContent className="pt-4 pb-4">

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { HelpDialog } from "@/components/help/help-dialog"
+import { CleanupDialog } from "@/components/help/cleanup-dialog"
 import { useGameStore } from "@/lib/game/store"
 import { Eye, Users, Sparkles, LogIn } from "lucide-react"
 
@@ -90,7 +91,7 @@ export default function HomePage() {
               <Eye className="w-10 h-10 text-primary" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">Impostor</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">ALIBI</h1>
           <p className="text-muted-foreground text-lg text-pretty max-w-xs">
             Descubra quem está blefando entre seus amigos
           </p>
@@ -222,6 +223,8 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+
+        <CleanupDialog />
 
         <Card className="w-full bg-card/50 backdrop-blur-sm border-border">
           <CardContent className="pt-6">

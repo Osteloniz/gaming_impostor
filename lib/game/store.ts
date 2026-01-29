@@ -9,7 +9,7 @@ interface GameStore extends GameState {
   createRoom: (hostName: string, mode: GameState["mode"], totalRounds: number) => Promise<void>
   joinRoom: (playerName: string, roomCode: string) => Promise<void>
   resumeSession: () => Promise<void>
-  startGame: () => Promise<void>
+  startGame: (options?: { themeMode?: "random" | "custom"; themeText?: string }) => Promise<void>
   markCardSeen: () => Promise<void>
   fetchMyCard: () => Promise<void>
   nextTurn: () => Promise<void>
@@ -90,11 +90,61 @@ const mapPlayers = (rows: PlayerRow[]): Player[] =>
     votedFor: row.voted_for,
   }))
 
+const areStringArraysEqual = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
+
+const arePlayersEqual = (a: Player[], b: Player[]) =>
+  a.length === b.length &&
+  a.every(
+    (player, index) =>
+      player.id === b[index]?.id &&
+      player.name === b[index]?.name &&
+      player.isHost === b[index]?.isHost &&
+      player.hasSeenCard === b[index]?.hasSeenCard &&
+      player.votedFor === b[index]?.votedFor,
+  )
+
+const maybeSetState = (
+  getState: () => GameState,
+  setState: (partial: Partial<GameState>) => void,
+  next: Partial<GameState>,
+) => {
+  const current = getState()
+  let changed = false
+
+  for (const [key, value] of Object.entries(next)) {
+    const currentValue = current[key as keyof GameState]
+    if (key === "players") {
+      if (!arePlayersEqual(current.players, value as Player[])) {
+        changed = true
+        break
+      }
+      continue
+    }
+    if (key === "turnOrder") {
+      if (!areStringArraysEqual(current.turnOrder, value as string[])) {
+        changed = true
+        break
+      }
+      continue
+    }
+    if (currentValue !== value) {
+      changed = true
+      break
+    }
+  }
+
+  if (changed) {
+    setState(next)
+  }
+}
+
 const hydrateRoom = async (
   roomId: string,
   roomCode: string,
   playerId: string,
   setState: (partial: Partial<GameState>) => void,
+  getState: () => GameState,
 ) => {
   const { data: room, error: roomError } = await supabase
     .from("rooms")
@@ -147,7 +197,7 @@ const hydrateRoom = async (
           return
         }
         const next = payload.new as RoomRow
-        setState({
+        maybeSetState(getState, setState, {
           status: next.status,
           mode: (next.mode as GameState["mode"]) || "presencial",
           totalRounds: next.total_rounds ?? 1,
@@ -174,7 +224,7 @@ const hydrateRoom = async (
           .order("created_at")
 
         if (data) {
-          setState({ players: mapPlayers(data as PlayerRow[]) })
+          maybeSetState(getState, setState, { players: mapPlayers(data as PlayerRow[]) })
         }
       },
     )
@@ -197,7 +247,7 @@ const hydrateRoom = async (
         .order("created_at")
 
       if (refreshedRoom) {
-        setState({
+        maybeSetState(getState, setState, {
           status: refreshedRoom.status,
           mode: (refreshedRoom.mode as GameState["mode"]) || "presencial",
           totalRounds: refreshedRoom.total_rounds ?? 1,
@@ -210,7 +260,7 @@ const hydrateRoom = async (
       }
 
       if (refreshedPlayers) {
-        setState({ players: mapPlayers(refreshedPlayers as PlayerRow[]) })
+        maybeSetState(getState, setState, { players: mapPlayers(refreshedPlayers as PlayerRow[]) })
       }
     }, 2000)
   }
@@ -226,7 +276,7 @@ export const useGameStore = create<GameStore>()(
           "/api/rooms/create",
           { name: hostName, mode, totalRounds },
         )
-        await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
+        await hydrateRoom(data.roomId, data.roomCode, data.playerId, set, get)
       },
 
       joinRoom: async (playerName: string, roomCode: string) => {
@@ -234,23 +284,27 @@ export const useGameStore = create<GameStore>()(
           "/api/rooms/join",
           { name: playerName, code: roomCode },
         )
-        await hydrateRoom(data.roomId, data.roomCode, data.playerId, set)
+        await hydrateRoom(data.roomId, data.roomCode, data.playerId, set, get)
       },
 
       resumeSession: async () => {
         const { roomId, roomCode, playerId } = get()
         if (!roomId || !playerId) return
         try {
-          await hydrateRoom(roomId, roomCode, playerId, set)
+          await hydrateRoom(roomId, roomCode, playerId, set, get)
         } catch {
           set(initialState)
         }
       },
 
-      startGame: async () => {
+      startGame: async (options) => {
         const { roomId } = get()
         if (!roomId) return
-        await fetchJson<{ ok: true }>("/api/game/start", { roomId })
+        await fetchJson<{ ok: true }>("/api/game/start", {
+          roomId,
+          themeMode: options?.themeMode ?? "random",
+          themeText: options?.themeText?.trim() || null,
+        })
         set({ theme: null, cardRole: null, results: null })
       },
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { HelpDialog } from "@/components/help/help-dialog"
+import { ExitActions } from "@/components/help/exit-actions"
 import { useGameStore } from "@/lib/game/store"
 import { Eye, EyeOff, Skull, MessageCircle } from "lucide-react"
 
@@ -156,6 +157,8 @@ export default function CardRevealPage() {
         {hasSeenCard && (
           <p className="text-xs text-muted-foreground text-center">Aguardando os outros jogadores...</p>
         )}
+
+        <ExitActions className="mt-2" />
       </div>
 
       <HelpDialog

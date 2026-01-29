@@ -7,6 +7,8 @@ export const runtime = "nodejs"
 export async function POST(request: Request) {
   const body = await request.json()
   const roomId = typeof body?.roomId === "string" ? body.roomId : ""
+  const themeMode = body?.themeMode === "custom" ? "custom" : "random"
+  const themeText = typeof body?.themeText === "string" ? body.themeText.trim() : ""
 
   if (!roomId) {
     return NextResponse.json({ error: "Room id is required" }, { status: 400 })
@@ -28,19 +30,51 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(10)
 
-  const { data: themes, error: themesError } = await supabaseAdmin
-    .from("themes")
-    .select("id")
-    .eq("active", true)
+  let theme: { id: string }
 
-  if (themesError || !themes || themes.length === 0) {
-    return NextResponse.json({ error: "No themes available" }, { status: 500 })
+  if (themeMode === "custom") {
+    if (!themeText) {
+      return NextResponse.json({ error: "Theme text is required" }, { status: 400 })
+    }
+
+    const { data: existingTheme } = await supabaseAdmin
+      .from("themes")
+      .select("id, text")
+      .eq("active", true)
+      .ilike("text", themeText)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingTheme) {
+      theme = { id: existingTheme.id }
+    } else {
+      const { data: insertedTheme, error: insertError } = await supabaseAdmin
+        .from("themes")
+        .insert({ text: themeText, active: true })
+        .select("id")
+        .single()
+
+      if (insertError || !insertedTheme) {
+        return NextResponse.json({ error: "Failed to create theme" }, { status: 500 })
+      }
+
+      theme = { id: insertedTheme.id }
+    }
+  } else {
+    const { data: themes, error: themesError } = await supabaseAdmin
+      .from("themes")
+      .select("id")
+      .eq("active", true)
+
+    if (themesError || !themes || themes.length === 0) {
+      return NextResponse.json({ error: "No themes available" }, { status: 500 })
+    }
+
+    const recentThemeIds = new Set((history || []).map((entry) => entry.theme_id).filter(Boolean))
+    const availableThemes = themes.filter((theme) => !recentThemeIds.has(theme.id))
+    const themePool = availableThemes.length > 0 ? availableThemes : themes
+    theme = themePool[Math.floor(Math.random() * themePool.length)]
   }
-
-  const recentThemeIds = new Set((history || []).map((entry) => entry.theme_id).filter(Boolean))
-  const availableThemes = themes.filter((theme) => !recentThemeIds.has(theme.id))
-  const themePool = availableThemes.length > 0 ? availableThemes : themes
-  const theme = themePool[Math.floor(Math.random() * themePool.length)]
 
   const impostorCounts = new Map<string, number>()
   for (const entry of history || []) {

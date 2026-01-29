@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { HelpDialog } from "@/components/help/help-dialog"
+import { ExitActions } from "@/components/help/exit-actions"
 import { useGameStore } from "@/lib/game/store"
 import { Vote, User, Check } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
@@ -185,6 +186,8 @@ export default function VotingPage() {
         <p className="text-xs text-muted-foreground text-center">
           Certifique-se que apenas você está vendo a tela ao votar
         </p>
+
+        <ExitActions className="mt-2" />
       </div>
 
       <HelpDialog

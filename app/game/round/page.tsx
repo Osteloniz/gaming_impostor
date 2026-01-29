@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { HelpDialog } from "@/components/help/help-dialog"
+import { ExitActions } from "@/components/help/exit-actions"
 import { useGameStore } from "@/lib/game/store"
 import { Mic, ArrowRight, Users, CheckCircle2 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
@@ -395,6 +396,8 @@ export default function RoundPage() {
               : "Aguardando o host avançar a rodada"}
           </p>
         )}
+
+        <ExitActions className="mt-2" />
       </div>
 
       <HelpDialog

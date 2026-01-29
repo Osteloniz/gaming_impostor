@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useGameStore } from "@/lib/game/store"
 import { Eye, Users, Sparkles, LogIn } from "lucide-react"
@@ -16,6 +17,11 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { createRoom, joinRoom, resumeSession, status, roomId, roomCode, playerId } = useGameStore()
+  const minRounds = 1
+  const maxRounds = 10
+
+  const clampRounds = (value: number) => Math.max(minRounds, Math.min(maxRounds, value))
+  const updateRounds = (value: number) => setRounds(clampRounds(value))
 
   const handleCreateRoom = async () => {
     if (!playerName.trim()) return
@@ -104,11 +110,11 @@ export default function HomePage() {
             />
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <label className="font-medium text-foreground">Modalidade:</label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setMode("presencial")}
-                  className={`px-3 py-1 rounded-md border ${
+                  className={`h-10 px-4 rounded-md border ${
                     mode === "presencial" ? "bg-primary text-primary-foreground border-primary" : "border-border"
                   }`}
                 >
@@ -117,7 +123,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setMode("online")}
-                  className={`px-3 py-1 rounded-md border ${
+                  className={`h-10 px-4 rounded-md border ${
                     mode === "online" ? "bg-primary text-primary-foreground border-primary" : "border-border"
                   }`}
                 >
@@ -125,16 +131,44 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-muted-foreground w-24">Rodadas:</label>
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={rounds}
-                onChange={(e) => setRounds(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
-                className="w-24"
-              />
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-muted-foreground">Rodadas</label>
+                <span className="rounded-md bg-secondary/60 px-2 py-1 text-sm font-medium text-foreground">
+                  {rounds}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-12 text-lg"
+                  onClick={() => updateRounds(rounds - 1)}
+                  disabled={rounds <= minRounds}
+                  aria-label="Diminuir rodadas"
+                >
+                  -
+                </Button>
+                <Slider
+                  min={minRounds}
+                  max={maxRounds}
+                  step={1}
+                  value={[rounds]}
+                  onValueChange={(value) => updateRounds(value[0] ?? minRounds)}
+                  className="flex-1 py-2"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-12 text-lg"
+                  onClick={() => updateRounds(rounds + 1)}
+                  disabled={rounds >= maxRounds}
+                  aria-label="Aumentar rodadas"
+                >
+                  +
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Escolha entre {minRounds} e {maxRounds} rodadas</p>
             </div>
             <Button
               onClick={handleCreateRoom}
